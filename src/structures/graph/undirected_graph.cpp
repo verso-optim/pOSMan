@@ -19,7 +19,8 @@ bool UndirectedGraph::has_node(const Node& node) {
 
 void UndirectedGraph::add_node(const Node& node) {
   _osm_id_to_index.insert(std::make_pair(node.osm_id, nodes.size()));
-  nodes.push_back({node.osm_id, node.lon, node.lat});
+  nodes.emplace_back(node.osm_id, node.lon, node.lat);
+  adjacency_list.push_back({});
 }
 
 void UndirectedGraph::add_edge(Id osm_way_id,
@@ -33,10 +34,17 @@ void UndirectedGraph::add_edge(Id osm_way_id,
     this->add_node(target);
   }
 
-  auto source_index = _osm_id_to_index.find(source.osm_id)->second;
-  auto target_index = _osm_id_to_index.find(target.osm_id)->second;
-  adjacency_list[source_index].push_back({osm_way_id, target_index, length});
-  adjacency_list[target_index].push_back({osm_way_id, source_index, length});
+  auto source_ref = _osm_id_to_index.find(source.osm_id);
+  assert(source_ref != _osm_id_to_index.end());
+  auto target_ref = _osm_id_to_index.find(target.osm_id);
+  assert(target_ref != _osm_id_to_index.end());
+
+  adjacency_list[source_ref->second].emplace_back(osm_way_id,
+                                                  target_ref->second,
+                                                  length);
+  adjacency_list[target_ref->second].emplace_back(osm_way_id,
+                                                  source_ref->second,
+                                                  length);
 }
 
 } // namespace posman

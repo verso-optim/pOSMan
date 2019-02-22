@@ -11,6 +11,7 @@ MAIN = ../bin/posman
 SRC = $(wildcard *.cpp)\
 			$(wildcard ./structures/*.cpp)\
 			$(wildcard ./structures/graph/*.cpp)\
+			$(wildcard ./utils/*.cpp)\
 
 OBJ = $(SRC:.cpp=.o)
 DEPS = $(SRC:.cpp=.d)

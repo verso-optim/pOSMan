@@ -7,8 +7,12 @@ All rights reserved (see LICENSE).
 
 */
 
+#include <cassert>
 #include <iostream>
+#include <numeric>
 #include <unistd.h>
+
+#include "utils/osm_parser.h"
 
 void display_usage() {
   std::string usage = "Copyright (C) 2019, VERSO\n";
@@ -45,7 +49,18 @@ int main(int argc, char** argv) {
     opt = getopt(argc, argv, optString);
   }
 
-  std::cout << nodes_file << " / " << edges_file << std::endl;
+  std::cout << "[info] Loading graph." << std::endl;
+  auto graph = posman::io::parse(nodes_file, edges_file);
+
+  unsigned adjacencies =
+    std::accumulate(graph.adjacency_list.begin(),
+                    graph.adjacency_list.end(),
+                    0,
+                    [&](auto sum, const auto& l) { return sum + l.size(); });
+  assert(adjacencies % 2 == 0);
+
+  std::cout << "  Graph has " << graph.nodes.size() << " nodes and "
+            << (adjacencies / 2) << " edges." << std::endl;
 
   return 0;
 }

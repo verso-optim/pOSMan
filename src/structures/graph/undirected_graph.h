@@ -19,8 +19,12 @@ namespace posman {
 
 struct Edge {
   Id osm_way_id;
-  Index neighbour;
+  Index to;
   Distance length;
+
+  Edge(Id osm_way_id, Index to, Distance length)
+    : osm_way_id(osm_way_id), to(to), length(length) {
+  }
 };
 
 class UndirectedGraph {
