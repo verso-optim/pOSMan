@@ -22,7 +22,10 @@ void UndirectedGraph::add_node(const Node& node) {
   nodes.push_back({node.osm_id, node.lon, node.lat});
 }
 
-void UndirectedGraph::add_edge(Id osm_way_id, const Node& source, const Node& target, Distance length) {
+void UndirectedGraph::add_edge(Id osm_way_id,
+                               const Node& source,
+                               const Node& target,
+                               Distance length) {
   if (!this->has_node(source)) {
     this->add_node(source);
   }

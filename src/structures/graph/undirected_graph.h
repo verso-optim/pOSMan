@@ -35,7 +35,10 @@ public:
   std::vector<Node> nodes;
   std::vector<std::vector<Edge>> adjacency_list;
 
-  void add_edge(Id osm_way_id, const Node& source, const Node& target, Distance length);
+  void add_edge(Id osm_way_id,
+                const Node& source,
+                const Node& target,
+                Distance length);
 };
 
 } // namespace posman
