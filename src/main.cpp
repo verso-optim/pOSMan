@@ -14,12 +14,14 @@ All rights reserved (see LICENSE).
 
 #include "structures/typedefs.h"
 #include "utils/osm_parser.h"
+#include "utils/output_json.h"
 
 void display_usage() {
   std::string usage = "Copyright (C) 2019, VERSO\n";
   usage += "\n\tposman [OPTION]... -i FILE\n";
   usage += "Options:\n";
   usage += "\t-e EDGES,\t\t\t file containing OSM edges\n";
+  usage += "\t-g GEOJSON,\t\t\t file to write target graph\n";
   usage += "\t-n NODES,\t\t\t file containing OSM nodes\n";
   usage += "\t-w WAYS,\t\t\t file containing target ways\n";
   std::cout << usage << std::endl;
@@ -29,10 +31,11 @@ void display_usage() {
 
 int main(int argc, char** argv) {
   // Parsing command-line arguments.
-  const char* optString = "e:h?n:w:";
+  const char* optString = "e:g:h?n:w:";
   int opt = getopt(argc, argv, optString);
 
   std::string edges_file;
+  std::string geojson_target;
   std::string nodes_file;
   std::string ways_file;
 
@@ -40,6 +43,9 @@ int main(int argc, char** argv) {
     switch (opt) {
     case 'e':
       edges_file = optarg;
+      break;
+    case 'g':
+      geojson_target = optarg;
       break;
     case 'h':
       display_usage();
@@ -81,6 +87,10 @@ int main(int argc, char** argv) {
             << static_cast<int>(100 * static_cast<float>(even_nodes) /
                                 target_nodes)
             << "%)" << std::endl;
+
+  if (!geojson_target.empty()) {
+    posman::io::log_graph_as_geojson(target_graph, geojson_target);
+  }
 
   return 0;
 }
