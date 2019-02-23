@@ -9,7 +9,9 @@ All rights reserved (see LICENSE).
 
 #include <cassert>
 #include <fstream>
+#include <iostream>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "structures/graph/node.h"
 #include "utils/osm_parser.h"
@@ -17,8 +19,8 @@ All rights reserved (see LICENSE).
 namespace posman {
 namespace io {
 
-UndirectedGraph parse(const std::string& nodes_filename,
-                      const std::string& edges_filename) {
+UndirectedGraph parse_graph(const std::string& nodes_filename,
+                            const std::string& edges_filename) {
   UndirectedGraph graph;
 
   // Parsing OSM nodes.
@@ -93,6 +95,71 @@ UndirectedGraph parse(const std::string& nodes_filename,
   }
 
   return graph;
+}
+
+struct custom_hash {
+  template <class T1, class T2>
+  std::size_t operator()(std::pair<T1, T2> const& pair) const {
+    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+  }
+};
+
+UndirectedGraph parse_ways(const std::string& ways_filename,
+                           const UndirectedGraph& global_graph) {
+  std::ifstream ways_file(ways_filename);
+  std::string current_line;
+
+  std::unordered_set<Id> ways_ids;
+  std::unordered_set<Id> done_ways;
+
+  while (std::getline(ways_file, current_line)) {
+    ways_ids.insert(strtoul(current_line.c_str(), nullptr, 10));
+  }
+
+  UndirectedGraph target_graph;
+
+  // Remember pair with source and target node id to avoid duplicates,
+  // as edges are stored in both ways in adjacency list.
+  std::unordered_set<std::pair<Id, Id>, custom_hash> source_target;
+
+  for (std::size_t i = 0; i < global_graph.number_of_nodes(); ++i) {
+    auto& source_node = global_graph.nodes[i];
+    auto source_id = source_node.osm_id;
+
+    for (const auto& edge : global_graph.adjacency_list[i]) {
+      auto search_way = ways_ids.find(edge.osm_way_id);
+      if (search_way == ways_ids.end()) {
+        // Current edge from global graph should not be included in
+        // target graph.
+        continue;
+      }
+      done_ways.insert(edge.osm_way_id);
+
+      auto& target_node = global_graph.nodes[edge.to];
+      auto target_id = target_node.osm_id;
+
+      auto search = source_target.find(std::make_pair(target_id, source_id));
+      if (search != source_target.end()) {
+        // This edge has already been added the other way around.
+        continue;
+      }
+
+      target_graph.add_edge(edge.osm_way_id,
+                            source_node,
+                            target_node,
+                            edge.length);
+      source_target.insert(std::make_pair(source_id, target_id));
+    }
+  }
+
+  for (auto id : ways_ids) {
+    if (done_ways.find(id) == done_ways.end()) {
+      std::cout << "[Warning] Way id not found in OSM extract: " << id
+                << std::endl;
+    }
+  }
+
+  return target_graph;
 }
 
 } // namespace io

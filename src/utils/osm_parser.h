@@ -15,8 +15,11 @@ All rights reserved (see LICENSE).
 namespace posman {
 namespace io {
 
-UndirectedGraph parse(const std::string& nodes_filename,
-                      const std::string& edges_filename);
+UndirectedGraph parse_graph(const std::string& nodes_filename,
+                            const std::string& edges_filename);
+
+UndirectedGraph parse_ways(const std::string& ways_filename,
+                           const UndirectedGraph& global_graph);
 
 } // namespace io
 } // namespace posman

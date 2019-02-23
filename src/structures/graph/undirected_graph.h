@@ -43,6 +43,10 @@ public:
                 const Node& source,
                 const Node& target,
                 Distance length);
+
+  unsigned number_of_nodes() const;
+
+  unsigned number_of_edges() const;
 };
 
 } // namespace posman
