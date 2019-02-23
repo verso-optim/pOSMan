@@ -62,15 +62,17 @@ int main(int argc, char** argv) {
     opt = getopt(argc, argv, optString);
   }
 
+  using namespace posman;
+
   std::cout << "[info] Loading global graph." << std::endl;
-  auto global_graph = posman::io::parse_graph(nodes_file, edges_file);
+  auto global_graph = io::parse_graph(nodes_file, edges_file);
 
   std::cout << "  Global graph has " << global_graph.number_of_nodes()
             << " nodes and " << global_graph.number_of_edges() << " edges."
             << std::endl;
 
   std::cout << "[info] Loading target graph." << std::endl;
-  auto target_graph = posman::io::parse_ways(ways_file, global_graph);
+  auto target_graph = io::parse_ways(ways_file, global_graph);
 
   unsigned target_nodes = target_graph.number_of_nodes();
 
@@ -89,7 +91,7 @@ int main(int argc, char** argv) {
             << "%)" << std::endl;
 
   if (!geojson_target.empty()) {
-    posman::io::log_graph_as_geojson(target_graph, geojson_target);
+    io::log_graph_as_geojson(target_graph, geojson_target);
   }
 
   return 0;

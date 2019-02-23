@@ -8,7 +8,9 @@ All rights reserved (see LICENSE).
 */
 
 #include <cassert>
+#include <limits>
 #include <numeric>
+#include <queue>
 
 #include "structures/graph/undirected_graph.h"
 
@@ -62,6 +64,85 @@ unsigned UndirectedGraph::number_of_edges() const {
   assert(adjacencies % 2 == 0);
 
   return adjacencies / 2;
+}
+
+struct IndexWithDistance {
+  Index index;
+  Distance length;
+  IndexWithDistance(Index index, Distance length)
+    : index(index), length(length){};
+  bool operator<(IndexWithDistance rhs) const {
+    return this->length > rhs.length;
+  }
+};
+
+std::vector<Distance>
+UndirectedGraph::one_to_many(Id source, std::vector<Id> targets) const {
+  std::vector<Distance> target_lengths(targets.size());
+
+  auto source_ref = _osm_id_to_index.find(source);
+  assert(source_ref != _osm_id_to_index.end());
+  auto source_rank = source_ref->second;
+
+  // Used to:
+  //
+  // 1. translate OSM id to index in nodes
+  // 2. remember where to store lengths
+  // 3. for stopping condition
+  std::unordered_map<Index, std::size_t> node_rank_to_target_rank;
+
+  for (std::size_t i = 0; i < targets.size(); ++i) {
+    auto target_ref = _osm_id_to_index.find(targets[i]);
+    assert(target_ref != _osm_id_to_index.end());
+
+    node_rank_to_target_rank.insert(std::make_pair(target_ref->second, i));
+  }
+
+  // Simple Dijkstra to reach all targets.
+  std::priority_queue<IndexWithDistance, std::vector<IndexWithDistance>>
+    to_visit;
+  to_visit.emplace(source_rank, 0);
+
+  // Remember shortest weights.
+  std::vector<Distance> lengths(nodes.size(),
+                                std::numeric_limits<Distance>::max());
+  lengths[source_rank] = 0;
+
+  while (!to_visit.empty()) {
+    // Get node index with minimum length and pop it from the queue.
+    auto current_node = to_visit.top();
+    auto current_index = current_node.index;
+    to_visit.pop();
+
+    auto search_target = node_rank_to_target_rank.find(current_index);
+    if (search_target != node_rank_to_target_rank.end()) {
+      // We've reached one of the targets.
+      target_lengths[search_target->second] = current_node.length;
+      node_rank_to_target_rank.erase(search_target);
+      if (node_rank_to_target_rank.empty()) {
+        break;
+      }
+    }
+
+    if (current_node.length > lengths[current_index]) {
+      // Discard inserting a candidate already stored with cheaper
+      // length.
+      continue;
+    }
+
+    for (const auto& edge : adjacency_list[current_index]) {
+      auto new_length = lengths[current_index] + edge.length;
+      if (new_length < lengths[edge.to]) {
+        // Update known length to node.
+        lengths[edge.to] = new_length;
+        to_visit.emplace(edge.to, new_length);
+      }
+    }
+  }
+
+  assert(node_rank_to_target_rank.empty());
+
+  return target_lengths;
 }
 
 } // namespace posman
