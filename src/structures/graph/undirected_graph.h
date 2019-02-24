@@ -48,7 +48,12 @@ public:
 
   unsigned number_of_edges() const;
 
-  std::vector<Distance> one_to_many(Id source, std::vector<Id> targets) const;
+  Node node_from_id(Id osm_id) const;
+
+  std::vector<Distance>
+  one_to_many(Id source,
+              const std::vector<Id>& targets,
+              std::unordered_map<Id, Id>& parents_map) const;
 };
 
 } // namespace posman

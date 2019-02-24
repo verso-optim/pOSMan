@@ -68,6 +68,13 @@ unsigned UndirectedGraph::number_of_edges() const {
   return adjacencies / 2;
 }
 
+Node UndirectedGraph::node_from_id(Id osm_id) const {
+  auto search = _osm_id_to_index.find(osm_id);
+  assert(search != _osm_id_to_index.end());
+
+  return nodes[search->second];
+}
+
 struct IndexWithDistance {
   Index index;
   Distance length;
@@ -79,7 +86,9 @@ struct IndexWithDistance {
 };
 
 std::vector<Distance>
-UndirectedGraph::one_to_many(Id source, std::vector<Id> targets) const {
+UndirectedGraph::one_to_many(Id source,
+                             const std::vector<Id>& targets,
+                             std::unordered_map<Id, Id>& parents_map) const {
   std::vector<Distance> target_lengths(targets.size());
 
   auto source_ref = _osm_id_to_index.find(source);
@@ -105,7 +114,7 @@ UndirectedGraph::one_to_many(Id source, std::vector<Id> targets) const {
     to_visit;
   to_visit.emplace(source_rank, 0);
 
-  // Remember shortest weights.
+  // Remember shortest lengths.
   std::vector<Distance> lengths(nodes.size(),
                                 std::numeric_limits<Distance>::max());
   lengths[source_rank] = 0;
@@ -138,6 +147,14 @@ UndirectedGraph::one_to_many(Id source, std::vector<Id> targets) const {
         // Update known length to node.
         lengths[edge.to] = new_length;
         to_visit.emplace(edge.to, new_length);
+        // Update parent for destination node.
+        auto search = parents_map.find(nodes[edge.to].osm_id);
+        if (search != parents_map.end()) {
+          search->second = nodes[current_index].osm_id;
+        } else {
+          parents_map.insert(
+            std::make_pair(nodes[edge.to].osm_id, nodes[current_index].osm_id));
+        }
       }
     }
   }

@@ -118,17 +118,22 @@ int main(int argc, char** argv) {
                  });
 
   auto N = odd_nodes_ids.size();
-  std::vector<std::vector<Distance>> lengths_matrix(N,
-                                                    std::vector<Distance>(N));
+  std::vector<std::vector<Distance>> lengths_matrix(N);
+
+  //  Remember parent nodes for each source in one-to-many search.
+  std::unordered_map<Id, std::unordered_map<Id, Id>> source_to_parents;
 
   for (std::size_t i = 0; i < N; ++i) {
-    auto line = global_graph.one_to_many(odd_nodes_ids[0], odd_nodes_ids);
-    for (std::size_t j = 0; j < line.size(); ++j) {
-      lengths_matrix[i][i + j] = line[j];
-      lengths_matrix[i + j][i] = line[j];
-    }
+    auto source_map = source_to_parents.insert(
+      std::make_pair(target_graph.nodes[odd_degree_node_ranks[i]].osm_id,
+                     std::unordered_map<Id, Id>()));
+
+    assert(source_map.second);
+
+    lengths_matrix[i] = global_graph.one_to_many(odd_nodes_ids[i],
+                                                 odd_nodes_ids,
+                                                 source_map.first->second);
     lengths_matrix[i][i] = 3 * (std::numeric_limits<Distance>::max() / 4);
-    odd_nodes_ids.erase(odd_nodes_ids.begin());
   }
 
   // 5. Compute minimum weight perfect matching for odd nodes.
