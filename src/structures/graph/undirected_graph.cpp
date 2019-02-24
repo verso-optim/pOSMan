@@ -7,6 +7,8 @@ All rights reserved (see LICENSE).
 
 */
 
+#include <iostream>
+
 #include <cassert>
 #include <limits>
 #include <numeric>
@@ -140,6 +142,13 @@ UndirectedGraph::one_to_many(Id source, std::vector<Id> targets) const {
     }
   }
 
+  if (!node_rank_to_target_rank.empty()) {
+    std::cout << "Unreachable nodes: ";
+    for (const auto& m : node_rank_to_target_rank) {
+      std::cout << nodes[m.first].osm_id << " ; ";
+    }
+    std::cout << std::endl;
+  }
   assert(node_rank_to_target_rank.empty());
 
   return target_lengths;

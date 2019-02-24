@@ -7,6 +7,7 @@ All rights reserved (see LICENSE).
 
 */
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
@@ -92,6 +93,69 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
   }
 
   json_output.AddMember("features", json_features, allocator);
+
+  write_to_json(json_output, output_file);
+}
+
+void write_output(const UndirectedGraph& graph,
+                  const std::vector<Index>& path,
+                  const std::vector<Id>& path_way_ids,
+                  const std::string& output_file) {
+  rapidjson::Document json_output;
+  json_output.SetObject();
+  rapidjson::Document::AllocatorType& allocator = json_output.GetAllocator();
+
+  rapidjson::Value json_legs(rapidjson::kArrayType);
+
+  assert(path[0] == path[path.size() - 1]);
+  assert(path_way_ids.size() + 1 == path.size());
+
+  Distance total_length = 0;
+
+  for (std::size_t i = 0; i < path_way_ids.size(); ++i) {
+    auto current_rank = path[i];
+    auto next_rank = path[i + 1];
+    auto current_way_id = path_way_ids[i];
+
+    auto edge = std::find_if(graph.adjacency_list[current_rank].begin(),
+                             graph.adjacency_list[current_rank].end(),
+                             [current_way_id, next_rank](const auto& e) {
+                               return (e.osm_way_id == current_way_id) and
+                                      (e.to == next_rank);
+                             });
+
+    assert(edge != graph.adjacency_list[current_rank].end());
+
+    rapidjson::Value json_leg(rapidjson::kObjectType);
+    json_leg.AddMember("length", edge->length, allocator);
+    json_leg.AddMember("way_id", edge->osm_way_id, allocator);
+
+    rapidjson::Value json_nodes(rapidjson::kArrayType);
+
+    rapidjson::Value json_from_node(rapidjson::kObjectType);
+    rapidjson::Value json_from_coords(rapidjson::kArrayType);
+    json_from_coords.PushBack(graph.nodes[current_rank].lon, allocator);
+    json_from_coords.PushBack(graph.nodes[current_rank].lat, allocator);
+    json_from_node.AddMember("id", graph.nodes[current_rank].osm_id, allocator);
+    json_from_node.AddMember("coordinates", json_from_coords, allocator);
+    json_nodes.PushBack(json_from_node, allocator);
+
+    rapidjson::Value json_to_node(rapidjson::kObjectType);
+    rapidjson::Value json_to_coords(rapidjson::kArrayType);
+    json_to_coords.PushBack(graph.nodes[next_rank].lon, allocator);
+    json_to_coords.PushBack(graph.nodes[next_rank].lat, allocator);
+    json_to_node.AddMember("id", graph.nodes[next_rank].osm_id, allocator);
+    json_to_node.AddMember("coordinates", json_to_coords, allocator);
+    json_nodes.PushBack(json_to_node, allocator);
+
+    json_leg.AddMember("nodes", json_nodes, allocator);
+    json_legs.PushBack(json_leg, allocator);
+
+    total_length += edge->length;
+  }
+
+  json_output.AddMember("legs", json_legs, allocator);
+  json_output.AddMember("length", total_length, allocator);
 
   write_to_json(json_output, output_file);
 }

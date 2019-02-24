@@ -10,7 +10,6 @@ All rights reserved (see LICENSE).
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <list>
 #include <unistd.h>
 #include <unordered_set>
 
@@ -26,6 +25,7 @@ void display_usage() {
   usage += "\t-e EDGES,\t\t\t file containing OSM edges\n";
   usage += "\t-g GEOJSON,\t\t\t file to write target graph\n";
   usage += "\t-n NODES,\t\t\t file containing OSM nodes\n";
+  usage += "\t-o OUTPUT,\t\t\t output file name\n";
   usage += "\t-s START,\t\t\t OSM node id for starting point\n";
   usage += "\t-w WAYS,\t\t\t file containing target ways\n";
   std::cout << usage << std::endl;
@@ -35,12 +35,13 @@ void display_usage() {
 
 int main(int argc, char** argv) {
   // Parsing command-line arguments.
-  const char* optString = "e:g:h?n:s:w:";
+  const char* optString = "e:g:h?n:o:s:w:";
   int opt = getopt(argc, argv, optString);
 
   std::string edges_file;
   std::string geojson_target;
   std::string nodes_file;
+  std::string output_file;
   posman::Id start_id;
   std::string ways_file;
 
@@ -57,6 +58,9 @@ int main(int argc, char** argv) {
       break;
     case 'n':
       nodes_file = optarg;
+      break;
+    case 'o':
+      output_file = optarg;
       break;
     case 's':
       start_id = std::stoul(optarg);
@@ -198,14 +202,16 @@ int main(int argc, char** argv) {
   }
 
   // 6. Use Hierholzer's algorithm to derive an eulerian path.
+  auto eulerian_graph = target_graph;
   auto start =
-    std::find_if(target_graph.nodes.begin(),
-                 target_graph.nodes.end(),
+    std::find_if(eulerian_graph.nodes.begin(),
+                 eulerian_graph.nodes.end(),
                  [&](const auto& n) { return n.osm_id == start_id; });
-  assert(start != target_graph.nodes.end());
+  assert(start != eulerian_graph.nodes.end());
 
-  std::list<Index> eulerian_path;
-  eulerian_path.push_back(std::distance(target_graph.nodes.begin(), start));
+  std::vector<Index> eulerian_path;
+  std::vector<Id> eulerian_path_way_ids;
+  eulerian_path.push_back(std::distance(eulerian_graph.nodes.begin(), start));
 
   bool complete_tour = false;
   while (!complete_tour) {
@@ -215,13 +221,14 @@ int main(int argc, char** argv) {
       std::find_if(eulerian_path.begin(),
                    eulerian_path.end(),
                    [&](const auto rank) {
-                     return !target_graph.adjacency_list[rank].empty();
+                     return !eulerian_graph.adjacency_list[rank].empty();
                    });
     complete_tour = (new_tour_start == eulerian_path.end());
 
     if (!complete_tour) {
       // Add new tour to initial eulerian path and check again.
-      std::list<Index> new_tour;
+      std::vector<Index> new_tour;
+      std::vector<Id> new_ways;
       Index initial_node_rank = *new_tour_start;
       Index current_node_rank = initial_node_rank;
       Index next_node_rank;
@@ -230,34 +237,44 @@ int main(int argc, char** argv) {
         // Find next node from any adjacent edge and remove used edge
         // in both ways in adjacency lists.
         auto chosen_edge =
-          target_graph.adjacency_list[current_node_rank].begin();
+          eulerian_graph.adjacency_list[current_node_rank].begin();
         next_node_rank = chosen_edge->to;
+        new_ways.push_back(chosen_edge->osm_way_id);
 
         auto reverse_edge =
-          std::find_if(target_graph.adjacency_list[next_node_rank].begin(),
-                       target_graph.adjacency_list[next_node_rank].end(),
+          std::find_if(eulerian_graph.adjacency_list[next_node_rank].begin(),
+                       eulerian_graph.adjacency_list[next_node_rank].end(),
                        [&](const auto& e) {
                          return (e.osm_way_id == chosen_edge->osm_way_id) and
                                 (e.to == current_node_rank);
                        });
 
         assert(reverse_edge !=
-               target_graph.adjacency_list[next_node_rank].end());
-        target_graph.adjacency_list[current_node_rank].erase(chosen_edge);
-        target_graph.adjacency_list[next_node_rank].erase(reverse_edge);
+               eulerian_graph.adjacency_list[next_node_rank].end());
+        eulerian_graph.adjacency_list[current_node_rank].erase(chosen_edge);
+        eulerian_graph.adjacency_list[next_node_rank].erase(reverse_edge);
 
         current_node_rank = next_node_rank;
       } while (current_node_rank != initial_node_rank);
 
       // Adding new tour to existing eulerian path.
+      auto new_ways_start =
+        eulerian_path_way_ids.begin() +
+        std::distance(eulerian_path.begin(), new_tour_start);
+
       eulerian_path.insert(new_tour_start, new_tour.begin(), new_tour.end());
+      eulerian_path_way_ids.insert(new_ways_start,
+                                   new_ways.begin(),
+                                   new_ways.end());
     }
   }
 
-  for (auto s : eulerian_path) {
-    std::cout << s << " -> ";
+  if (!output_file.empty()) {
+    io::write_output(target_graph,
+                     eulerian_path,
+                     eulerian_path_way_ids,
+                     output_file);
   }
-  std::cout << std::endl;
 
   return 0;
 }
