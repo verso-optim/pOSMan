@@ -275,9 +275,11 @@ int main(int argc, char** argv) {
   }
 
   if (!output_file.empty()) {
-    io::write_output(target_graph,
+    io::write_output(global_graph,
+                     target_graph,
                      eulerian_path,
                      eulerian_path_way_ids,
+                     source_to_parents,
                      output_file);
   }
 

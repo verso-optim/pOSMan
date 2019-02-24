@@ -97,10 +97,13 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
   write_to_json(json_output, output_file);
 }
 
-void write_output(const UndirectedGraph& graph,
-                  const std::vector<Index>& path,
-                  const std::vector<Id>& path_way_ids,
-                  const std::string& output_file) {
+void write_output(
+  const UndirectedGraph& global_graph,
+  const UndirectedGraph& target_graph,
+  const std::vector<Index>& path,
+  const std::vector<Id>& path_way_ids,
+  const std::unordered_map<Id, std::unordered_map<Id, Id>>& source_to_parents,
+  const std::string& output_file) {
   rapidjson::Document json_output;
   json_output.SetObject();
   rapidjson::Document::AllocatorType& allocator = json_output.GetAllocator();
@@ -117,39 +120,88 @@ void write_output(const UndirectedGraph& graph,
     auto next_rank = path[i + 1];
     auto current_way_id = path_way_ids[i];
 
-    auto edge = std::find_if(graph.adjacency_list[current_rank].begin(),
-                             graph.adjacency_list[current_rank].end(),
+    auto edge = std::find_if(target_graph.adjacency_list[current_rank].begin(),
+                             target_graph.adjacency_list[current_rank].end(),
                              [current_way_id, next_rank](const auto& e) {
                                return (e.osm_way_id == current_way_id) and
                                       (e.to == next_rank);
                              });
 
-    assert(edge != graph.adjacency_list[current_rank].end());
+    assert(edge != target_graph.adjacency_list[current_rank].end());
 
     rapidjson::Value json_leg(rapidjson::kObjectType);
     json_leg.AddMember("length", edge->length, allocator);
-    json_leg.AddMember("way_id", edge->osm_way_id, allocator);
 
-    rapidjson::Value json_nodes(rapidjson::kArrayType);
+    if (edge->osm_way_id < META_WAY_ID - 1) {
+      // Regular edge from an OSM way.
+      json_leg.AddMember("way_id", edge->osm_way_id, allocator);
 
-    rapidjson::Value json_from_node(rapidjson::kObjectType);
-    rapidjson::Value json_from_coords(rapidjson::kArrayType);
-    json_from_coords.PushBack(graph.nodes[current_rank].lon, allocator);
-    json_from_coords.PushBack(graph.nodes[current_rank].lat, allocator);
-    json_from_node.AddMember("id", graph.nodes[current_rank].osm_id, allocator);
-    json_from_node.AddMember("coordinates", json_from_coords, allocator);
-    json_nodes.PushBack(json_from_node, allocator);
+      rapidjson::Value json_nodes(rapidjson::kArrayType);
 
-    rapidjson::Value json_to_node(rapidjson::kObjectType);
-    rapidjson::Value json_to_coords(rapidjson::kArrayType);
-    json_to_coords.PushBack(graph.nodes[next_rank].lon, allocator);
-    json_to_coords.PushBack(graph.nodes[next_rank].lat, allocator);
-    json_to_node.AddMember("id", graph.nodes[next_rank].osm_id, allocator);
-    json_to_node.AddMember("coordinates", json_to_coords, allocator);
-    json_nodes.PushBack(json_to_node, allocator);
+      rapidjson::Value json_from_node(rapidjson::kObjectType);
+      rapidjson::Value json_from_coords(rapidjson::kArrayType);
+      json_from_coords.PushBack(target_graph.nodes[current_rank].lon,
+                                allocator);
+      json_from_coords.PushBack(target_graph.nodes[current_rank].lat,
+                                allocator);
+      json_from_node.AddMember("id",
+                               target_graph.nodes[current_rank].osm_id,
+                               allocator);
+      json_from_node.AddMember("coordinates", json_from_coords, allocator);
+      json_nodes.PushBack(json_from_node, allocator);
 
-    json_leg.AddMember("nodes", json_nodes, allocator);
-    json_legs.PushBack(json_leg, allocator);
+      rapidjson::Value json_to_node(rapidjson::kObjectType);
+      rapidjson::Value json_to_coords(rapidjson::kArrayType);
+      json_to_coords.PushBack(target_graph.nodes[next_rank].lon, allocator);
+      json_to_coords.PushBack(target_graph.nodes[next_rank].lat, allocator);
+      json_to_node.AddMember("id",
+                             target_graph.nodes[next_rank].osm_id,
+                             allocator);
+      json_to_node.AddMember("coordinates", json_to_coords, allocator);
+      json_nodes.PushBack(json_to_node, allocator);
+
+      json_leg.AddMember("nodes", json_nodes, allocator);
+      json_legs.PushBack(json_leg, allocator);
+    } else {
+      // Meta edge added after one-to-many search, we want to retrieve
+      // the whole path.
+      json_leg.AddMember("way_id", 0, allocator);
+
+      auto current_id = target_graph.nodes[current_rank].osm_id;
+      auto search_map = source_to_parents.find(current_id);
+      assert(search_map != source_to_parents.end());
+
+      auto& parents_map = search_map->second;
+
+      std::vector<Id> reversed_ids;
+      Id dijkstra_id = target_graph.nodes[next_rank].osm_id;
+      while (dijkstra_id != current_id) {
+        reversed_ids.push_back(dijkstra_id);
+        auto search = parents_map.find(dijkstra_id);
+        assert(search != parents_map.end());
+        dijkstra_id = search->second;
+      }
+      reversed_ids.push_back(current_id);
+
+      rapidjson::Value json_nodes(rapidjson::kArrayType);
+
+      for (auto iter = reversed_ids.crbegin(); iter != reversed_ids.crend();
+           ++iter) {
+        auto current_node = global_graph.node_from_id(*iter);
+        assert(current_node.osm_id == *iter);
+
+        rapidjson::Value json_node(rapidjson::kObjectType);
+        rapidjson::Value json_coords(rapidjson::kArrayType);
+        json_coords.PushBack(current_node.lon, allocator);
+        json_coords.PushBack(current_node.lat, allocator);
+        json_node.AddMember("id", current_node.osm_id, allocator);
+        json_node.AddMember("coordinates", json_coords, allocator);
+        json_nodes.PushBack(json_node, allocator);
+      }
+
+      json_leg.AddMember("nodes", json_nodes, allocator);
+      json_legs.PushBack(json_leg, allocator);
+    }
 
     total_length += edge->length;
   }
