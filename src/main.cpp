@@ -98,24 +98,24 @@ int main(int argc, char** argv) {
 
   // 4. Compute a many-to-many matrix of distances (in the global
   // graph) between nodes of odd degree in the target graph.
-  std::vector<Id> node_ids;
+  std::vector<Id> odd_nodes_ids;
   std::transform(odd_degree_node_ranks.begin(),
                  odd_degree_node_ranks.end(),
-                 std::back_inserter(node_ids),
+                 std::back_inserter(odd_nodes_ids),
                  [&](auto rank) { return target_graph.nodes[rank].osm_id; });
 
-  auto N = node_ids.size();
+  auto N = odd_nodes_ids.size();
   std::vector<std::vector<Distance>> lengths_matrix(N,
                                                     std::vector<Distance>(N));
 
   for (std::size_t i = 0; i < N; ++i) {
-    auto line = global_graph.one_to_many(node_ids[0], node_ids);
+    auto line = global_graph.one_to_many(odd_nodes_ids[0], odd_nodes_ids);
     for (std::size_t j = 0; j < line.size(); ++j) {
       lengths_matrix[i][i + j] = line[j];
       lengths_matrix[i + j][i] = line[j];
     }
     lengths_matrix[i][i] = 3 * (std::numeric_limits<Distance>::max() / 4);
-    node_ids.erase(node_ids.begin());
+    odd_nodes_ids.erase(odd_nodes_ids.begin());
   }
 
   // 5. Compute minimum weight perfect matching for odd nodes.
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
   // Storing those edges from mwpm that are coherent regarding
   // symmetry (y -> x whenever x -> y). Remembering the rest of them
-  // for further use.
+  // by their rank in odd_degree_node_ranks for further use.
   std::vector<Index> wrong_node_ranks;
   unsigned total_ok = 0;
 
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
     auto first_node_rank = odd_degree_node_ranks[match.first];
     auto second_node_rank = odd_degree_node_ranks[match.second];
 
-    if (mwpm.at(match.second) == match.first) {
+    if (mwpm[match.second] == match.first) {
       ++total_ok;
       target_graph.add_edge(META_WAY_ID,
                             target_graph.nodes[first_node_rank],
@@ -141,6 +141,35 @@ int main(int argc, char** argv) {
                             lengths_matrix[match.first][match.second]);
     } else {
       wrong_node_ranks.push_back(match.first);
+    }
+  }
+
+  if (!wrong_node_ranks.empty()) {
+    // Run a greedy algorithm to get a symmetric matching for wrong
+    // nodes.
+    std::vector<std::vector<Distance>> sub_matrix(wrong_node_ranks.size(),
+                                                  std::vector<Distance>(
+                                                    wrong_node_ranks.size()));
+    for (std::size_t i = 0; i < wrong_node_ranks.size(); ++i) {
+      for (std::size_t j = 0; j < wrong_node_ranks.size(); ++j) {
+        sub_matrix[i][j] =
+          lengths_matrix[wrong_node_ranks[i]][wrong_node_ranks[j]];
+      }
+    }
+
+    auto remaining_greedy_mwpm = greedy_symmetric_approx_mwpm(sub_matrix);
+
+    // Adding edges so all initially odd nodes now have an even degree.
+    for (const auto& match : remaining_greedy_mwpm) {
+      auto first_node_rank =
+        odd_degree_node_ranks[wrong_node_ranks[match.first]];
+      auto second_node_rank =
+        odd_degree_node_ranks[wrong_node_ranks[match.second]];
+
+      target_graph.add_edge(META_WAY_ID - 1,
+                            target_graph.nodes[first_node_rank],
+                            target_graph.nodes[second_node_rank],
+                            sub_matrix[match.first][match.second]);
     }
   }
 

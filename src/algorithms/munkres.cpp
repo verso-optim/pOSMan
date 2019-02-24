@@ -7,7 +7,9 @@ All rights reserved (see LICENSE).
 
 */
 
+#include <cassert>
 #include <limits>
+#include <set>
 #include <unordered_set>
 
 #include "algorithms/munkres.h"
@@ -182,7 +184,49 @@ minimum_weight_perfect_matching(const std::vector<std::vector<T>>& m) {
   return matching_xy;
 }
 
+template <class T>
+std::unordered_map<Index, Index>
+greedy_symmetric_approx_mwpm(const std::vector<std::vector<T>>& m) {
+  // Fast greedy algorithm for finding a symmetric perfect matching,
+  // choosing always smaller possible value, no minimality
+  // assured. Matrix size should be even!
+  assert(m.size() % 2 == 0);
+
+  std::unordered_map<Index, Index> matching;
+  std::set<Index> remaining_indices;
+  for (Index i = 0; i < m.size(); ++i) {
+    remaining_indices.insert(i);
+  }
+
+  while (remaining_indices.size() > 0) {
+    T min_weight = std::numeric_limits<T>::max();
+    std::set<Index>::iterator chosen_i;
+    std::set<Index>::iterator chosen_j;
+    for (auto i = remaining_indices.begin(); i != remaining_indices.end();
+         ++i) {
+      auto j = i;
+      ++j;
+      for (; j != remaining_indices.end(); ++j) {
+        T current_weight = m[*i][*j];
+        if (current_weight < min_weight) {
+          min_weight = current_weight;
+          chosen_i = i;
+          chosen_j = j;
+        }
+      }
+    }
+    matching.emplace(*chosen_i, *chosen_j);
+    remaining_indices.erase(chosen_j);
+    remaining_indices.erase(chosen_i);
+  }
+
+  return matching;
+}
+
 template std::unordered_map<Index, Index>
 minimum_weight_perfect_matching(const std::vector<std::vector<Distance>>& m);
+
+template std::unordered_map<Index, Index>
+greedy_symmetric_approx_mwpm(const std::vector<std::vector<Distance>>& m);
 
 } // namespace posman

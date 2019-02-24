@@ -65,7 +65,9 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
                                 allocator);
       json_properties.AddMember("stroke", rapidjson::Value(), allocator);
       json_properties["stroke"].SetString(
-        (current_way == META_WAY_ID) ? "#FF0000" : "#555555");
+        (current_way == META_WAY_ID)
+          ? "#FF0000"
+          : (current_way == META_WAY_ID - 1) ? "#0000FF" : "#555555");
       json_feature.AddMember("properties", json_properties, allocator);
 
       rapidjson::Value json_geometry(rapidjson::kObjectType);

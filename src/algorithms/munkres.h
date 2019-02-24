@@ -21,6 +21,10 @@ template <class T>
 std::unordered_map<Index, Index>
 minimum_weight_perfect_matching(const std::vector<std::vector<T>>& m);
 
+template <class T>
+std::unordered_map<Index, Index>
+greedy_symmetric_approx_mwpm(const std::vector<std::vector<T>>& m);
+
 } // namespace posman
 
 #endif
