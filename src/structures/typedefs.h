@@ -19,7 +19,7 @@ using Index = uint32_t;
 using Distance = uint32_t;
 using Coordinate = double;
 
-constexpr Id META_WAY_ID = std::numeric_limits<Distance>::max();
+constexpr Id META_WAY_ID = std::numeric_limits<Id>::max();
 
 } // namespace posman
 
