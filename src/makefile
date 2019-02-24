@@ -9,6 +9,7 @@ LDLIBS = -lpthread
 # Using all cpp files in current directory.
 MAIN = ../bin/posman
 SRC = $(wildcard *.cpp)\
+			$(wildcard ./algorithms/*.cpp)\
 			$(wildcard ./structures/*.cpp)\
 			$(wildcard ./structures/graph/*.cpp)\
 			$(wildcard ./utils/*.cpp)\
