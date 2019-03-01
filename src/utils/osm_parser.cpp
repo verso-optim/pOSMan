@@ -117,6 +117,7 @@ UndirectedGraph parse_ways(const std::string& ways_filename,
   }
 
   UndirectedGraph target_graph;
+  Distance total_length = 0;
 
   // Remember pair with source and target node id to avoid duplicates,
   // as edges are stored in both ways in adjacency list.
@@ -148,9 +149,13 @@ UndirectedGraph parse_ways(const std::string& ways_filename,
                             source_node,
                             target_node,
                             edge.length);
+      total_length += edge.length;
       source_target.insert(std::make_pair(source_id, target_id));
     }
   }
+
+  std::cout << "[Info] Total length for ways to visit: " << total_length
+            << " cm." << std::endl;
 
   for (auto id : ways_ids) {
     if (done_ways.find(id) == done_ways.end()) {
