@@ -93,6 +93,54 @@ int main(int argc, char** argv) {
   std::cout << "  Target graph has " << target_nodes << " nodes and "
             << target_graph.number_of_edges() << " edges." << std::endl;
 
+  // 2. bis Force doubling edges for dead-ends because this is what we
+  // would like to do for those in step 3. anyway (and it avoids
+  // potential non-symmetric matching in Munkres).
+  std::vector<std::vector<Node>> addition_chains;
+
+  for (std::size_t i = 0; i < target_nodes; ++i) {
+    Node current = target_graph.nodes[i];
+    if (global_graph.degree(current.osm_id) == 1) {
+      auto neighbours_ids = target_graph.neighbours_ids(current.osm_id);
+      if (neighbours_ids.size() != 1) {
+        std::cout << current.osm_id << std::endl;
+        for (auto n : neighbours_ids) {
+          std::cout << n << " / ";
+        }
+        std::cout << std::endl;
+      }
+      assert(neighbours_ids.size() == 1);
+
+      Node next = target_graph.node_from_id(neighbours_ids[0]);
+
+      addition_chains.push_back({current, next});
+      auto& addition_chain = addition_chains.back();
+
+      auto previous_id = current.osm_id;
+      current = next;
+      while (target_graph.degree(current.osm_id) == 2) {
+        neighbours_ids = target_graph.neighbours_ids(current.osm_id);
+        assert(neighbours_ids.size() == 2);
+
+        Id next_id = (neighbours_ids[0] == previous_id) ? neighbours_ids[1]
+                                                        : neighbours_ids[0];
+        assert(next_id != previous_id);
+
+        next = target_graph.node_from_id(next_id);
+        addition_chain.push_back(next);
+
+        previous_id = current.osm_id;
+        current = next;
+      }
+    }
+  }
+
+  for (const auto& addition_chain : addition_chains) {
+    for (unsigned i = 0; i < addition_chain.size() - 1; ++i) {
+      target_graph.duplicate_edge(addition_chain[i], addition_chain[i + 1]);
+    }
+  }
+
   // 3. Find out all nodes of odd degree in target rank.
   std::vector<Index> odd_degree_node_ranks;
   for (std::size_t i = 0; i < target_nodes; ++i) {

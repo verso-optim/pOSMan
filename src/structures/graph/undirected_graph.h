@@ -44,11 +44,17 @@ public:
                 const Node& target,
                 Distance length);
 
+  void duplicate_edge(const Node& source, const Node& target);
+
   unsigned number_of_nodes() const;
 
   unsigned number_of_edges() const;
 
+  unsigned degree(Id osm_id) const;
+
   Node node_from_id(Id osm_id) const;
+
+  std::vector<Id> neighbours_ids(Id osm_id) const;
 
   std::vector<Distance>
   one_to_many(Id source,

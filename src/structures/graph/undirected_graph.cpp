@@ -7,9 +7,9 @@ All rights reserved (see LICENSE).
 
 */
 
-#include <iostream>
-
+#include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <limits>
 #include <numeric>
 #include <queue>
@@ -53,6 +53,24 @@ void UndirectedGraph::add_edge(Id osm_way_id,
   adjacency_list[target_rank].emplace_back(osm_way_id, source_rank, length);
 }
 
+void UndirectedGraph::duplicate_edge(const Node& source, const Node& target) {
+  auto source_ref = _osm_id_to_index.find(source.osm_id);
+  assert(source_ref != _osm_id_to_index.end());
+  auto source_rank = source_ref->second;
+  auto target_ref = _osm_id_to_index.find(target.osm_id);
+  assert(target_ref != _osm_id_to_index.end());
+  auto target_rank = target_ref->second;
+
+  // Find existing edge.
+  auto search =
+    std::find_if(adjacency_list[source_rank].begin(),
+                 adjacency_list[source_rank].end(),
+                 [&](const auto& e) { return e.to == target_rank; });
+  assert(search != adjacency_list[source_rank].end());
+
+  this->add_edge(search->osm_way_id, source, target, search->length);
+}
+
 unsigned UndirectedGraph::number_of_nodes() const {
   return nodes.size();
 }
@@ -68,11 +86,30 @@ unsigned UndirectedGraph::number_of_edges() const {
   return adjacencies / 2;
 }
 
+unsigned UndirectedGraph::degree(Id osm_id) const {
+  auto search = _osm_id_to_index.find(osm_id);
+  assert(search != _osm_id_to_index.end());
+
+  return adjacency_list[search->second].size();
+}
+
 Node UndirectedGraph::node_from_id(Id osm_id) const {
   auto search = _osm_id_to_index.find(osm_id);
   assert(search != _osm_id_to_index.end());
 
   return nodes[search->second];
+}
+
+std::vector<Id> UndirectedGraph::neighbours_ids(Id osm_id) const {
+  auto search = _osm_id_to_index.find(osm_id);
+  assert(search != _osm_id_to_index.end());
+
+  std::vector<Id> ids;
+  std::transform(adjacency_list[search->second].begin(),
+                 adjacency_list[search->second].end(),
+                 std::back_inserter(ids),
+                 [&](const auto& e) { return nodes[e.to].osm_id; });
+  return ids;
 }
 
 struct IndexWithDistance {
