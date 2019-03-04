@@ -236,11 +236,10 @@ int main(int argc, char** argv) {
       } while (mwpm[current] != wn);
     }
 
-    std::cout << "[Info] Force even cycles" << std::endl;
     for (std::size_t i = 0; i < cycles.size(); ++i) {
       auto& cycle = cycles[i];
       if (cycle.size() % 2 == 0) {
-        std::cout << "  - ";
+        std::cout << "[Info] Force even cycle: ";
         for (std::size_t k = 0; k < cycle.size(); ++k) {
           std::cout << target_graph.nodes[odd_degree_node_ranks[cycle[k]]]
                          .osm_id
@@ -262,6 +261,38 @@ int main(int argc, char** argv) {
           }
         }
         std::cout << std::endl;
+      } else {
+        auto& costs = cycle_costs[i];
+
+        auto min_search = std::min_element(costs.begin(), costs.end());
+        auto offset = std::distance(costs.begin(), min_search);
+        auto first_rank = cycle[offset];
+        auto second_rank = cycle[(offset + 1) % cycle.size()];
+
+        target_graph
+          .add_edge(META_WAY_ID,
+                    target_graph.nodes[odd_degree_node_ranks[first_rank]],
+                    target_graph.nodes[odd_degree_node_ranks[second_rank]],
+                    lengths_matrix[first_rank][second_rank]);
+
+        std::cout << "[Info] Pick cheapest edge in odd cycle: "
+                  << target_graph.nodes[odd_degree_node_ranks[first_rank]]
+                       .osm_id
+                  << " -> "
+                  << target_graph.nodes[odd_degree_node_ranks[second_rank]]
+                       .osm_id
+                  << std::endl;
+
+        auto search = std::find(wrong_node_ranks.begin(),
+                                wrong_node_ranks.end(),
+                                first_rank);
+        assert(search != wrong_node_ranks.end());
+        wrong_node_ranks.erase(search);
+        search = std::find(wrong_node_ranks.begin(),
+                           wrong_node_ranks.end(),
+                           second_rank);
+        assert(search != wrong_node_ranks.end());
+        wrong_node_ranks.erase(search);
       }
     }
 
