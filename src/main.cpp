@@ -179,14 +179,13 @@ int main(int argc, char** argv) {
   }
 
   // 5. Compute perfect matching for odd nodes.
-  auto matching = compute_matching(lengths_matrix);
+  auto matching = blossom_matching(lengths_matrix);
 
   assert(2 * matching.size() == odd_degree_node_ranks.size());
 
   for (const auto& match : matching) {
     auto first_node_rank = odd_degree_node_ranks[match.first];
     auto second_node_rank = odd_degree_node_ranks[match.second];
-
     target_graph.add_edge(META_WAY_ID,
                           target_graph.nodes[first_node_rank],
                           target_graph.nodes[second_node_rank],

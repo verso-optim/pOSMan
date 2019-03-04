@@ -9,6 +9,7 @@ All rights reserved (see LICENSE).
 
 #include <algorithm>
 #include <cassert>
+#include <fstream>
 #include <iostream>
 #include <unordered_set>
 
@@ -142,7 +143,49 @@ compute_matching(const std::vector<std::vector<T>>& m) {
   return matching;
 }
 
+template <class T>
+std::unordered_map<Index, Index>
+blossom_matching(const std::vector<std::vector<T>>& m) {
+  std::unordered_map<Index, Index> mwpm;
+
+  auto node_count = m.size();
+  auto edge_count = node_count * (node_count - 1);
+
+  std::ofstream output;
+  output.open("matrix");
+  output << node_count << " " << edge_count << std::endl;
+
+  for (size_t i = 0; i < node_count; ++i) {
+    for (size_t j = 0; j < node_count; ++j) {
+      if (i != j) {
+        output << i << " " << j << " " << m[i][j] << std::endl;
+      }
+    }
+  }
+
+  output.close();
+
+  std::system("blossom5 -e matrix -w mwpm");
+
+  std::ifstream input;
+  input.open("mwpm");
+
+  Index i, j;
+
+  std::string skip;
+  std::getline(input, skip); // skip first line
+  while (!input.eof()) {
+    input >> i >> j;
+    mwpm[i] = j;
+  }
+
+  return mwpm;
+}
+
 template std::unordered_map<Index, Index>
 compute_matching(const std::vector<std::vector<Distance>>& m);
+
+template std::unordered_map<Index, Index>
+blossom_matching(const std::vector<std::vector<Distance>>& m);
 
 } // namespace posman

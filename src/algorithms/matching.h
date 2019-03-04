@@ -21,6 +21,10 @@ template <class T>
 std::unordered_map<Index, Index>
 compute_matching(const std::vector<std::vector<T>>& m);
 
+template <class T>
+std::unordered_map<Index, Index>
+blossom_matching(const std::vector<std::vector<T>>& m);
+
 } // namespace posman
 
 #endif
