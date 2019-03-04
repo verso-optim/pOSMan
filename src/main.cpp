@@ -102,13 +102,6 @@ int main(int argc, char** argv) {
     Node current = target_graph.nodes[i];
     if (global_graph.degree(current.osm_id) == 1) {
       auto neighbours_ids = target_graph.neighbours_ids(current.osm_id);
-      if (neighbours_ids.size() != 1) {
-        std::cout << current.osm_id << std::endl;
-        for (auto n : neighbours_ids) {
-          std::cout << n << " / ";
-        }
-        std::cout << std::endl;
-      }
       assert(neighbours_ids.size() == 1);
 
       Node next = target_graph.node_from_id(neighbours_ids[0]);
@@ -216,6 +209,62 @@ int main(int argc, char** argv) {
   }
 
   if (!wrong_node_ranks.empty()) {
+    // Spot cycles.
+    std::unordered_set<Index> seen;
+    std::vector<std::vector<Index>> cycles;
+    std::vector<std::vector<Distance>> cycle_costs;
+
+    for (const auto wn : wrong_node_ranks) {
+      if (seen.find(wn) != seen.end()) {
+        continue;
+      }
+      seen.insert(wn);
+      cycles.push_back({wn});
+      auto& current_cycle = cycles.back();
+      cycle_costs.push_back({lengths_matrix[wn][mwpm[wn]]});
+      auto& current_costs = cycle_costs.back();
+
+      auto current = wn;
+      do {
+        auto next = mwpm[current];
+        seen.insert(next);
+
+        current_cycle.push_back(next);
+        current_costs.push_back(lengths_matrix[next][mwpm[next]]);
+
+        current = next;
+      } while (mwpm[current] != wn);
+    }
+
+    std::cout << "[Info] Force even cycles" << std::endl;
+    for (std::size_t i = 0; i < cycles.size(); ++i) {
+      auto& cycle = cycles[i];
+      if (cycle.size() % 2 == 0) {
+        std::cout << "  - ";
+        for (std::size_t k = 0; k < cycle.size(); ++k) {
+          std::cout << target_graph.nodes[odd_degree_node_ranks[cycle[k]]]
+                         .osm_id
+                    << "\t";
+          auto search = std::find(wrong_node_ranks.begin(),
+                                  wrong_node_ranks.end(),
+                                  cycle[k]);
+          assert(search != wrong_node_ranks.end());
+          wrong_node_ranks.erase(search);
+
+          if (k % 2 == 0) {
+            auto first_rank = cycle[k];
+            auto second_rank = cycle[(k + 1) % cycle.size()];
+            target_graph
+              .add_edge(META_WAY_ID,
+                        target_graph.nodes[odd_degree_node_ranks[first_rank]],
+                        target_graph.nodes[odd_degree_node_ranks[second_rank]],
+                        lengths_matrix[first_rank][second_rank]);
+          }
+        }
+        std::cout << std::endl;
+      }
+    }
+
     // Run a greedy algorithm to get a symmetric matching for wrong
     // nodes.
     std::vector<std::vector<Distance>> sub_matrix(wrong_node_ranks.size(),
