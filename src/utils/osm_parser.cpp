@@ -59,29 +59,34 @@ UndirectedGraph parse_graph(const std::string& nodes_filename,
       static_cast<Distance>(100 * std::stod(current_line.substr(s, e - s)));
 
     // Profile statuses.
+    // car_forward
+    s = e + 1;
+    e = current_line.find(',', s);
+    // auto car_forward =
+    //   strtoul(current_line.substr(s, e - s).c_str(), nullptr, 10);
+
+    // car_backward
+    s = e + 1;
+    e = current_line.find(',', s);
+    // auto car_backward =
+    //   strtoul(current_line.substr(s, e - s).c_str(), nullptr, 10);
+
+    // bike_forward
+    s = e + 1;
+    e = current_line.find(',', s);
+    // auto bike_forward =
+    //   strtoul(current_line.substr(s, e - s).c_str(), nullptr, 10);
+
+    // bike_backward
+    s = e + 1;
+    e = current_line.find(',', s);
+    // auto bike_backward =
+    //   strtoul(current_line.substr(s, e - s).c_str(), nullptr, 10);
+
+    // foot
     s = e + 1;
     e = current_line.find(',', s);
     auto foot = strtoul(current_line.substr(s, e - s).c_str(), nullptr, 10);
-    // // car_forward
-    // s = e + 1;
-    // e = current_line.find(',', s);
-    // auto car_forward = strtoul(current_line.substr(s, e - s).c_str(),
-    // nullptr, 10);
-    // // car_backward
-    // s = e + 1;
-    // e = current_line.find(',', s);
-    // auto car_backward = strtoul(current_line.substr(s, e - s).c_str(),
-    // nullptr, 10);
-    // // bike_forward
-    // s = e + 1;
-    // e = current_line.find(',', s);
-    // auto bike_forward = strtoul(current_line.substr(s, e - s).c_str(),
-    // nullptr, 10);
-    // // bike_backward
-    // s = e + 1;
-    // e = current_line.find(',', s);
-    // auto bike_backward = strtoul(current_line.substr(s, e - s).c_str(),
-    // nullptr, 10);
 
     if (foot != 0) {
       auto source = nodes.find(source_node_id);
