@@ -11,6 +11,7 @@ All rights reserved (see LICENSE).
 */
 
 #include <limits>
+#include <vector>
 
 namespace posman {
 
@@ -18,6 +19,10 @@ using Id = uint64_t;
 using Index = uint32_t;
 using Distance = uint32_t;
 using Coordinate = double;
+
+using GeometryList = std::unordered_map<
+  Id,
+  std::unordered_map<Id, std::vector<std::array<Coordinate, 2>>>>;
 
 constexpr Id META_WAY_ID = std::numeric_limits<Id>::max();
 

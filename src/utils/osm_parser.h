@@ -16,7 +16,8 @@ namespace posman {
 namespace io {
 
 UndirectedGraph parse_graph(const std::string& nodes_filename,
-                            const std::string& edges_filename);
+                            const std::string& edges_filename,
+                            GeometryList& geometries);
 
 UndirectedGraph parse_ways(const std::string& ways_filename,
                            const UndirectedGraph& global_graph);

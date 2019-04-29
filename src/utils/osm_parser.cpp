@@ -10,6 +10,7 @@ All rights reserved (see LICENSE).
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -20,7 +21,8 @@ namespace posman {
 namespace io {
 
 UndirectedGraph parse_graph(const std::string& nodes_filename,
-                            const std::string& edges_filename) {
+                            const std::string& edges_filename,
+                            GeometryList& geometries) {
   UndirectedGraph graph;
 
   // Parsing OSM nodes.
@@ -95,7 +97,26 @@ UndirectedGraph parse_graph(const std::string& nodes_filename,
       auto target = nodes.find(target_node_id);
       assert(target != nodes.end());
 
+      // Parse edge LINESTRING.
+      std::vector<std::array<Coordinate, 2>> geometry;
+      s = e + 1;
+      assert(current_line.substr(s, 12) == "\"LINESTRING(");
+      std::string::size_type end = current_line.size() - 2;
+      assert(current_line.substr(end) == ")\"");
+
+      std::istringstream linestring_stream(
+        current_line.substr(s + 12, end - s - 12));
+      std::string coordinates;
+      while (std::getline(linestring_stream, coordinates, ',')) {
+        Coordinate lon, lat;
+        std::stringstream ss(coordinates);
+        ss >> lon >> lat;
+        geometry.push_back({lon, lat});
+      }
+
       graph.add_edge(osm_way_id, source->second, target->second, length);
+      geometries[source->second.osm_id][target->second.osm_id] =
+        std::move(geometry);
     }
   }
 

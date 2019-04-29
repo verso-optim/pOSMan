@@ -78,7 +78,8 @@ int main(int argc, char** argv) {
 
   // 1. Parsing the whole graph from OSM file.
   std::cout << "[info] Loading global graph." << std::endl;
-  auto global_graph = io::parse_graph(nodes_file, edges_file);
+  GeometryList geometries;
+  auto global_graph = io::parse_graph(nodes_file, edges_file, geometries);
 
   std::cout << "  Global graph has " << global_graph.number_of_nodes()
             << " nodes and " << global_graph.number_of_edges() << " edges."
