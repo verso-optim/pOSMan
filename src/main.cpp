@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
                        [](const auto& l) { return l.size() % 2 != 0; }) == 0);
 
   if (!geojson_target.empty()) {
-    io::log_graph_as_geojson(target_graph, geojson_target);
+    io::log_graph_as_geojson(target_graph, geojson_target, geometries);
   }
 
   // 6. Use Hierholzer's algorithm to derive an eulerian path.
@@ -276,6 +276,7 @@ int main(int argc, char** argv) {
                      eulerian_path,
                      eulerian_path_way_ids,
                      source_to_parents,
+                     geometries,
                      output_file);
   }
 

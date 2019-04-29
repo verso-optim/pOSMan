@@ -39,8 +39,48 @@ inline void write_to_json(const rapidjson::Document& json_output,
   }
 }
 
+inline void
+get_detailed_geometry(const GeometryList& geometries,
+                      const Node& source_node,
+                      const Node& target_node,
+                      rapidjson::Value& json_geometry,
+                      rapidjson::Document::AllocatorType& allocator) {
+  auto source_id = source_node.osm_id;
+  auto target_id = target_node.osm_id;
+  bool reverse = false;
+
+  auto search = geometries.find(source_id);
+  auto geom = ((geometries.begin())->second).begin();
+
+  if (search == geometries.end()) {
+    reverse = true;
+  } else {
+    geom = (search->second).find(target_id);
+    if (geom == (search->second).end()) {
+      reverse = true;
+    }
+  }
+
+  if (reverse) {
+    search = geometries.find(target_id);
+    assert(search != geometries.end());
+    geom = (search->second).find(source_id);
+    assert(geom != (search->second).end());
+  }
+
+  auto size = (geom->second).size();
+  for (unsigned i = 0; i < size; ++i) {
+    auto& coord = (reverse) ? (geom->second)[size - 1 - i] : (geom->second)[i];
+    rapidjson::Value json_coord(rapidjson::kArrayType);
+    json_coord.PushBack(coord[0], allocator);
+    json_coord.PushBack(coord[1], allocator);
+    json_geometry.PushBack(json_coord, allocator);
+  }
+}
+
 void log_graph_as_geojson(const UndirectedGraph& graph,
-                          const std::string& output_file) {
+                          const std::string& output_file,
+                          const GeometryList& geometries) {
   rapidjson::Document json_output;
   json_output.SetObject();
   rapidjson::Document::AllocatorType& allocator = json_output.GetAllocator();
@@ -51,6 +91,7 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
   rapidjson::Value json_features(rapidjson::kArrayType);
 
   for (std::size_t i = 0; i < graph.number_of_nodes(); ++i) {
+    const auto& node = graph.nodes[i];
     for (const auto& edge : graph.adjacency_list[i]) {
       auto current_way = edge.osm_way_id;
 
@@ -60,7 +101,7 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
 
       rapidjson::Value json_properties(rapidjson::kObjectType);
       json_properties.AddMember("way", current_way, allocator);
-      json_properties.AddMember("source", graph.nodes[i].osm_id, allocator);
+      json_properties.AddMember("source", node.osm_id, allocator);
       json_properties.AddMember("target",
                                 graph.nodes[edge.to].osm_id,
                                 allocator);
@@ -71,22 +112,32 @@ void log_graph_as_geojson(const UndirectedGraph& graph,
           : (current_way == META_WAY_ID - 1) ? "#0000FF" : "#555555");
       json_feature.AddMember("properties", json_properties, allocator);
 
-      rapidjson::Value json_geometry(rapidjson::kObjectType);
-      json_geometry.AddMember("type", rapidjson::Value(), allocator);
-      json_geometry["type"].SetString("LineString");
+      rapidjson::Value geojson_geometry(rapidjson::kObjectType);
+      geojson_geometry.AddMember("type", rapidjson::Value(), allocator);
+      geojson_geometry["type"].SetString("LineString");
 
-      rapidjson::Value json_coordinates(rapidjson::kArrayType);
-      rapidjson::Value json_source(rapidjson::kArrayType);
-      json_source.PushBack(graph.nodes[i].lon, allocator);
-      json_source.PushBack(graph.nodes[i].lat, allocator);
-      json_coordinates.PushBack(json_source, allocator);
-      rapidjson::Value json_target(rapidjson::kArrayType);
-      json_target.PushBack(graph.nodes[edge.to].lon, allocator);
-      json_target.PushBack(graph.nodes[edge.to].lat, allocator);
-      json_coordinates.PushBack(json_target, allocator);
-      json_geometry.AddMember("coordinates", json_coordinates, allocator);
+      rapidjson::Value json_geometry(rapidjson::kArrayType);
+      if (current_way == META_WAY_ID) {
+        rapidjson::Value json_source(rapidjson::kArrayType);
+        json_source.PushBack(node.lon, allocator);
+        json_source.PushBack(node.lat, allocator);
+        json_geometry.PushBack(json_source, allocator);
+        rapidjson::Value json_target(rapidjson::kArrayType);
+        json_target.PushBack(graph.nodes[edge.to].lon, allocator);
+        json_target.PushBack(graph.nodes[edge.to].lat, allocator);
+        json_geometry.PushBack(json_target, allocator);
+      } else {
+        // Retrieve detailed geometry.
+        get_detailed_geometry(geometries,
+                              node,
+                              graph.nodes[edge.to],
+                              json_geometry,
+                              allocator);
+      }
 
-      json_feature.AddMember("geometry", json_geometry, allocator);
+      geojson_geometry.AddMember("coordinates", json_geometry, allocator);
+
+      json_feature.AddMember("geometry", geojson_geometry, allocator);
 
       json_features.PushBack(json_feature, allocator);
     }
@@ -103,6 +154,7 @@ void write_output(
   const std::vector<Index>& path,
   const std::vector<Id>& path_way_ids,
   const std::unordered_map<Id, std::unordered_map<Id, Id>>& source_to_parents,
+  const GeometryList& geometries,
   const std::string& output_file) {
   rapidjson::Document json_output;
   json_output.SetObject();
@@ -161,6 +213,15 @@ void write_output(
       json_nodes.PushBack(json_to_node, allocator);
 
       json_leg.AddMember("nodes", json_nodes, allocator);
+
+      rapidjson::Value json_geometry(rapidjson::kArrayType);
+      get_detailed_geometry(geometries,
+                            target_graph.nodes[current_rank],
+                            target_graph.nodes[next_rank],
+                            json_geometry,
+                            allocator);
+
+      json_leg.AddMember("geometry", json_geometry, allocator);
       json_legs.PushBack(json_leg, allocator);
     } else {
       // Meta edge added after one-to-many search, we want to retrieve
@@ -184,11 +245,24 @@ void write_output(
       reversed_ids.push_back(current_id);
 
       rapidjson::Value json_nodes(rapidjson::kArrayType);
-
+      rapidjson::Value json_geometry(rapidjson::kArrayType);
       for (auto iter = reversed_ids.crbegin(); iter != reversed_ids.crend();
            ++iter) {
-        auto current_node = global_graph.node_from_id(*iter);
+        const auto& current_node = global_graph.node_from_id(*iter);
         assert(current_node.osm_id == *iter);
+
+        auto next = iter + 1;
+        if (next != reversed_ids.crend()) {
+          const auto& next_node = global_graph.node_from_id(*(next));
+          if (json_geometry.Size() > 0) {
+            json_geometry.PopBack();
+          }
+          get_detailed_geometry(geometries,
+                                current_node,
+                                next_node,
+                                json_geometry,
+                                allocator);
+        }
 
         rapidjson::Value json_node(rapidjson::kObjectType);
         rapidjson::Value json_coords(rapidjson::kArrayType);
@@ -200,6 +274,7 @@ void write_output(
       }
 
       json_leg.AddMember("nodes", json_nodes, allocator);
+      json_leg.AddMember("geometry", json_geometry, allocator);
       json_legs.PushBack(json_leg, allocator);
     }
 
