@@ -8,7 +8,8 @@ the road network derived from OpenStreetMap data.
 
 ## Demo
 
-Going through all edges in a small town:
+Going through all edges in a small town (click on the marker to start
+the animation):
 
 - [example 1](https://verso-optim.com/vrp-optim/chinese-postman-poc/monnieres/)
 - [example 2](https://verso-optim.com/vrp-optim/chinese-postman-poc/saint-lumine-de-clisson/)
